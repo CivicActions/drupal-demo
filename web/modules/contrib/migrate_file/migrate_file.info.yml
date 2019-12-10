@@ -4,10 +4,10 @@ description: Additional support for migrating files including importing files, d
 # core: 8.x
 package: Migrate
 dependencies:
-  - migrate
+  - drupal:migrate
 
-# Information added by Drupal.org packaging script on 2018-04-29
-version: '8.x-1.0-alpha4'
+# Information added by Drupal.org packaging script on 2018-10-09
+version: '8.x-1.1'
 core: '8.x'
 project: 'migrate_file'
-datestamp: 1525029487
+datestamp: 1539064383

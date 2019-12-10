@@ -115,6 +115,15 @@ abstract class BrowserTestBase extends TestCase {
   protected $profile = 'testing';
 
   /**
+   * The theme to install as the default for testing.
+   *
+   * Defaults to the install profile's default theme, if it specifies any.
+   *
+   * @var string
+   */
+  protected $defaultTheme;
+
+  /**
    * An array of custom translations suitable for drupal_rewrite_settings().
    *
    * @var array
@@ -124,7 +133,7 @@ abstract class BrowserTestBase extends TestCase {
   /*
    * Mink class for the default driver to use.
    *
-   * Shoud be a fully qualified class name that implements
+   * Should be a fully-qualified class name that implements
    * Behat\Mink\Driver\DriverInterface.
    *
    * Value can be overridden using the environment variable MINK_DRIVER_CLASS.
@@ -244,6 +253,16 @@ abstract class BrowserTestBase extends TestCase {
     $this->registerSessions();
 
     $this->initFrontPage();
+
+    // Copies cookies from the current environment, for example, XDEBUG_SESSION
+    // in order to support Xdebug.
+    // @see BrowserTestBase::initFrontPage()
+    $cookies = $this->extractCookiesFromRequest(\Drupal::request());
+    foreach ($cookies as $cookie_name => $values) {
+      foreach ($values as $value) {
+        $session->setCookie($cookie_name, $value);
+      }
+    }
 
     return $session;
   }
@@ -370,15 +389,6 @@ abstract class BrowserTestBase extends TestCase {
    * {@inheritdoc}
    */
   protected function setUp() {
-    // Installing Drupal creates 1000s of objects. Garbage collection of these
-    // objects is expensive. This appears to be causing random segmentation
-    // faults in PHP 5.x due to https://bugs.php.net/bug.php?id=72286. Once
-    // Drupal is installed is rebuilt, garbage collection is re-enabled.
-    $disable_gc = version_compare(PHP_VERSION, '7', '<') && gc_enabled();
-    if ($disable_gc) {
-      gc_collect_cycles();
-      gc_disable();
-    }
     parent::setUp();
 
     $this->setupBaseUrl();
@@ -388,22 +398,10 @@ abstract class BrowserTestBase extends TestCase {
     $this->installDrupal();
 
     // Setup Mink.
-    $session = $this->initMink();
-
-    $cookies = $this->extractCookiesFromRequest(\Drupal::request());
-    foreach ($cookies as $cookie_name => $values) {
-      foreach ($values as $value) {
-        $session->setCookie($cookie_name, $value);
-      }
-    }
+    $this->initMink();
 
     // Set up the browser test output file.
     $this->initBrowserOutputFile();
-    // If garbage collection was disabled prior to rebuilding container,
-    // re-enable it.
-    if ($disable_gc) {
-      gc_enable();
-    }
 
     // Ensure that the test is not marked as risky because of no assertions. In
     // PHPUnit 6 tests that only make assertions using $this->assertSession()
@@ -412,7 +410,7 @@ abstract class BrowserTestBase extends TestCase {
   }
 
   /**
-   * Ensures test files are deletable within file_unmanaged_delete_recursive().
+   * Ensures test files are deletable.
    *
    * Some tests chmod generated files to be read only. During
    * BrowserTestBase::cleanupEnvironment() and other cleanup operations,
@@ -420,6 +418,8 @@ abstract class BrowserTestBase extends TestCase {
    *
    * @param string $path
    *   The file path.
+   *
+   * @see \Drupal\Core\File\FileSystemInterface::deleteRecursive()
    */
   public static function filePreDeleteCallback($path) {
     // When the webserver runs with the same system user as phpunit, we can
@@ -448,7 +448,7 @@ abstract class BrowserTestBase extends TestCase {
     }
 
     // Delete test site directory.
-    file_unmanaged_delete_recursive($this->siteDirectory, [$this, 'filePreDeleteCallback']);
+    \Drupal::service('file_system')->deleteRecursive($this->siteDirectory, [$this, 'filePreDeleteCallback']);
   }
 
   /**
@@ -566,6 +566,7 @@ abstract class BrowserTestBase extends TestCase {
     $this->initSettings();
     $container = $this->initKernel(\Drupal::request());
     $this->initConfig($container);
+    $this->installDefaultThemeFromClassProperty($container);
     $this->installModulesFromClassProperty($container);
     $this->rebuildAll();
   }
@@ -646,10 +647,13 @@ abstract class BrowserTestBase extends TestCase {
    * @return array
    *   The HTTP headers values.
    *
-   * @deprecated Scheduled for removal in Drupal 9.0.0.
+   * @deprecated in drupal:8.8.0 and is removed from drupal:9.0.0.
    *   Use $this->getSession()->getResponseHeaders() instead.
+   *
+   * @see https://www.drupal.org/node/3067207
    */
   protected function drupalGetHeaders() {
+    @trigger_error('Drupal\Tests\BrowserTestBase::drupalGetHeaders() is deprecated in drupal:8.8.0 and is removed from drupal:9.0.0. Use $this->getSession()->getResponseHeaders() instead. See https://www.drupal.org/node/3067207', E_USER_DEPRECATED);
     return $this->getSession()->getResponseHeaders();
   }
 
@@ -677,23 +681,11 @@ abstract class BrowserTestBase extends TestCase {
    *   The JSON decoded drupalSettings value from the current page.
    */
   protected function getDrupalSettings() {
-    $html = $this->getSession()->getPage()->getHtml();
+    $html = $this->getSession()->getPage()->getContent();
     if (preg_match('@<script type="application/json" data-drupal-selector="drupal-settings-json">([^<]*)</script>@', $html, $matches)) {
       return Json::decode($matches[1]);
     }
     return [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function assertEquals($expected, $actual, $message = '', $delta = 0.0, $maxDepth = 10, $canonicalize = FALSE, $ignoreCase = FALSE) {
-    // Cast objects implementing MarkupInterface to string instead of
-    // relying on PHP casting them to string depending on what they are being
-    // comparing with.
-    $expected = static::castSafeStrings($expected);
-    $actual = static::castSafeStrings($actual);
-    parent::assertEquals($expected, $actual, $message, $delta, $maxDepth, $canonicalize, $ignoreCase);
   }
 
   /**
@@ -706,9 +698,14 @@ abstract class BrowserTestBase extends TestCase {
     $backtrace = debug_backtrace();
     // Find the test class that has the test method.
     while ($caller = Error::getLastCaller($backtrace)) {
-      if (isset($caller['class']) && $caller['class'] === get_class($this)) {
+      // If we match PHPUnit's TestCase::runTest, then the previously processed
+      // caller entry is where our test method sits.
+      if (isset($last_caller) && isset($caller['function']) && $caller['function'] === 'PHPUnit\Framework\TestCase->runTest()') {
+        // Return the last caller since that has to be the test class.
+        $caller = $last_caller;
         break;
       }
+
       // If the test method is implemented by a test class's parent then the
       // class name of $this will not be part of the backtrace.
       // In that case we process the backtrace until the caller is not a
@@ -718,6 +715,11 @@ abstract class BrowserTestBase extends TestCase {
         $caller = $last_caller;
         break;
       }
+
+      if (isset($caller['class']) && $caller['class'] === get_class($this)) {
+        break;
+      }
+
       // Otherwise we have not reached our test class yet: save the last caller
       // and remove an element from to backtrace to process the next call.
       $last_caller = $caller;

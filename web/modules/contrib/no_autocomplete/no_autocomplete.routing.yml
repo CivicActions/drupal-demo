@@ -5,3 +5,5 @@ no_autocomplete.admin_settings_form:
     _title: 'No Autocomplete'
   requirements:
     _permission: 'administer no_autocomplete'
+  options:
+    _admin_route: TRUE

@@ -22,7 +22,7 @@ class Cookie
      * Handles dates as defined by RFC 2616 section 3.3.1, and also some other
      * non-standard, but common formats.
      */
-    private static $dateFormats = array(
+    private static $dateFormats = [
         'D, d M Y H:i:s T',
         'D, d-M-y H:i:s T',
         'D, d-M-Y H:i:s T',
@@ -30,7 +30,7 @@ class Cookie
         'D, d-m-Y H:i:s T',
         'D M j G:i:s Y',
         'D M d H:i:s Y T',
-    );
+    ];
 
     protected $name;
     protected $value;
@@ -53,7 +53,7 @@ class Cookie
      * @param bool        $httponly     The cookie httponly flag
      * @param bool        $encodedValue Whether the value is encoded or not
      */
-    public function __construct(string $name, ?string $value, string $expires = null, string $path = null, string $domain = '', bool $secure = false, bool $httponly = true, bool $encodedValue = false)
+    public function __construct($name, $value, $expires = null, $path = null, $domain = '', $secure = false, $httponly = true, $encodedValue = false)
     {
         if ($encodedValue) {
             $this->value = urldecode($value);
@@ -65,8 +65,8 @@ class Cookie
         $this->name = $name;
         $this->path = empty($path) ? '/' : $path;
         $this->domain = $domain;
-        $this->secure = $secure;
-        $this->httponly = $httponly;
+        $this->secure = (bool) $secure;
+        $this->httponly = (bool) $httponly;
 
         if (null !== $expires) {
             $timestampAsDateTime = \DateTime::createFromFormat('U', $expires);
@@ -129,7 +129,7 @@ class Cookie
 
         list($name, $value) = explode('=', array_shift($parts), 2);
 
-        $values = array(
+        $values = [
             'name' => trim($name),
             'value' => trim($value),
             'expires' => null,
@@ -138,7 +138,7 @@ class Cookie
             'secure' => false,
             'httponly' => false,
             'passedRawValue' => true,
-        );
+        ];
 
         if (null !== $url) {
             if ((false === $urlParts = parse_url($url)) || !isset($urlParts['host'])) {
@@ -190,6 +190,11 @@ class Cookie
         );
     }
 
+    /**
+     * @param string $dateValue
+     *
+     * @return string|null
+     */
     private static function parseDate($dateValue)
     {
         // trim single quotes around date if present
@@ -207,6 +212,8 @@ class Cookie
         if (false !== $date = date_create($dateValue, new \DateTimeZone('GMT'))) {
             return $date->format('U');
         }
+
+        return null;
     }
 
     /**

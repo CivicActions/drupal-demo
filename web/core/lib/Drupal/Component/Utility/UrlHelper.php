@@ -26,9 +26,6 @@ class UrlHelper {
    * RFC3986 and as a consequence non compliant to RFC3987 and as a consequence
    * not valid as a "URL" in HTML5.
    *
-   * @todo Remove this function once PHP 5.4 is required as we can use just
-   *   http_build_query() directly.
-   *
    * @param array $query
    *   The query parameter array to be processed; for instance,
    *   \Drupal::request()->query->all().
@@ -154,7 +151,7 @@ class UrlHelper {
       }
 
       // Split off everything before the query string into 'path'.
-      $parts = explode('?', $url);
+      $parts = explode('?', $url, 2);
 
       // Don't support URLs without a path, like 'http://'.
       list(, $path) = explode('://', $parts[0], 2);
@@ -248,6 +245,16 @@ class UrlHelper {
    *   Exception thrown when a either $url or $bath_url are not fully qualified.
    */
   public static function externalIsLocal($url, $base_url) {
+    // Some browsers treat \ as / so normalize to forward slashes.
+    $url = str_replace('\\', '/', $url);
+
+    // Leading control characters may be ignored or mishandled by browsers, so
+    // assume such a path may lead to an non-local location. The \p{C} character
+    // class matches all UTF-8 control, unassigned, and private characters.
+    if (preg_match('/^\p{C}/u', $url) !== 0) {
+      return FALSE;
+    }
+
     $url_parts = parse_url($url);
     $base_parts = parse_url($base_url);
 

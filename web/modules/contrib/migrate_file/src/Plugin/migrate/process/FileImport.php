@@ -6,13 +6,15 @@ use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\migrate\MigrateException;
 use Drupal\migrate\MigrateExecutableInterface;
-use Drupal\migrate\Plugin\MigrateProcessInterface;
+use Drupal\migrate\MigrateSkipProcessException;
 use Drupal\migrate\Plugin\migrate\process\FileCopy;
+use Drupal\migrate\Plugin\MigrateProcessInterface;
 use Drupal\migrate\Row;
 use Drupal\file\Entity\File;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\ServerException;
 
 /**
  * Imports a file from an local or external source.
@@ -43,7 +45,7 @@ use GuzzleHttp\Exception\ConnectException;
  * - skip_on_missing_source: (optional) Boolean, if TRUE, this field will be
  *   skipped if the source file is missing (either not available locally or 404
  *   if it's a remote file). Otherwise, the row will fail with an error. Note
- *   that if you are importing a lot of remove files, this check will greatly
+ *   that if you are importing a lot of remote files, this check will greatly
  *   reduce the speed of your import as it requires an http request per file to
  *   check for existence. Defaults to FALSE.
  * - skip_on_error: (optional) Boolean, if TRUE, this field will be skipped
@@ -55,7 +57,7 @@ use GuzzleHttp\Exception\ConnectException;
  *
  * The destination and uid configuration fields support copying destination
  * values. These are indicated by a starting @ sign. Values using @ must be
- * wrapped in quotes. (the same as it works with the 'source' key).
+ * wrapped in quotes. (the same as it works with the 'source' property).
  *
  * @see Drupal\migrate\Plugin\migrate\process\Get
  *
@@ -75,20 +77,36 @@ use GuzzleHttp\Exception\ConnectException;
  *       name: image
  *       label: 'Main Image'
  *       selector: /image
+ *     -
+ *       name: text_field_1
+ *       label: 'Some Text Value'
+ *       selector: /text
+ *     -
+ *       name: text_field_2
+ *       label: 'Another Text Value'
+ *       selector: /text_2
  *   constants:
+ *     # Note the trailing slash indicates this destination is a directory so
+ *     # the filename will be kept intact when copying
  *     file_destination: 'public://path/to/save/'
+ *     # This is for creating dynamic destination paths (see below)
+ *     directory_separator: '/'
  * process:
  *   uid:
  *     plugin: default_value
  *     default_value: 1
+ *   #
  *   # Simple file import
+ *   #
  *   field_file:
  *     plugin: file_import
  *     source: file
  *     destination: constants/file_destination
  *     uid: @uid
  *     skip_on_missing_source: true
+ *   #
  *   # Custom field attributes
+ *   #
  *   field_image/target_id:
  *     plugin: file_import
  *     source: image
@@ -96,6 +114,29 @@ use GuzzleHttp\Exception\ConnectException;
  *     uid: @uid
  *     id_only: true
  *   field_image/alt: image
+ *   #
+ *   # Since the destination property can accept a destination value, you can
+ *   # create dynamic filepaths. First you create a temporary field (you can
+ *   # name this whatever you want as long as it isn't the name of a field on the
+ *   # migrate destination entity/object)
+ *   #
+ *   _file_destination:
+ *     plugin: concat
+ *     source:
+ *       - constants/file_destination
+ *       - constants/directory_separator
+ *       - '@text_field_1'
+ *       - constants/directory_separator
+ *       - '@text_field_2'
+ *       - constants/directory_separator
+ *   # Now we can use our pseudo temp field as a destination value
+ *   field_file:
+ *     plugin: file_import
+ *     source: file
+ *     destination: '@_file_destination'
+ *     uid: @uid
+ *     skip_on_missing_source: true
+ *
  *
  * @endcode
  *
@@ -170,6 +211,7 @@ class FileImport extends FileCopy {
           $file->setPermanent();
           $file->save();
         }
+
         return $id_only ? $file->id() : ['target_id' => $file->id()];
       }
       else {
@@ -186,7 +228,7 @@ class FileImport extends FileCopy {
         // Check if we're skipping on error
         if ($this->configuration['skip_on_error']) {
           $migrate_executable->saveMessage("File $source could not be imported to $destination. Operation failed with message: " . $e->getMessage());
-          return NULL;
+          throw new MigrateSkipProcessException($e->getMessage());
         }
         else {
           // Pass the error back on again.
@@ -302,6 +344,9 @@ class FileImport extends FileCopy {
       try {
         \Drupal::httpClient()->head($path);
         return TRUE;
+      }
+      catch (ServerException $e) {
+        return FALSE;
       }
       catch (ClientException $e) {
         return FALSE;

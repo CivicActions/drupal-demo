@@ -67,4 +67,3 @@ MAINTAINERS
 Current maintainers:
  * Adrian Cid Almaguer (adriancid) - https://www.drupal.org/u/adriancid
  * Randy Fay (rfay) - https://www.drupal.org/u/rfay
- * Dhruvesh Tripathi (dhruveshdtripathi) - https://www.drupal.org/user/3083735

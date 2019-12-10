@@ -33,6 +33,7 @@ class IframeDefaultFormatter extends FormatterBase {
       'scrolling' => 'auto',
       'transparency' => '0',
       'tokensupport' => '0',
+      'allowfullscreen' => '0',
     ) + parent::defaultSettings();
   }
 
@@ -107,11 +108,8 @@ class IframeDefaultFormatter extends FormatterBase {
       if (!isset($item->title)) {
         $item->title = '';
       }
-      $elements[$delta] = array(
-        '#markup' => self::iframe_iframe($item->title, $item->url, $item),
-        '#allowed_tags' => array('iframe', 'a', 'h3'),
-      );
-      # tokens can be dynamic, so its not cacheable
+      $elements[$delta] = self::iframe_iframe($item->title, $item->url, $item);
+      # Tokens can be dynamic, so its not cacheable.
       if (isset($settings['tokensupport']) && $settings['tokensupport']) {
         $elements[$delta]['cache'] = array('max-age' => 0);
       }
@@ -124,27 +122,27 @@ class IframeDefaultFormatter extends FormatterBase {
    * form the iframe code
    */
   static public function iframe_iframe($text, $path, $item) {
-    $options = array();
+    $options = [];
     $options['width'] = !empty($item->width)? $item->width : '100%';
     $options['height'] = !empty($item->height)? $item->height : '701';
 
     if (!empty($item->frameborder) && $item->frameborder > 0) {
-        $options['frameborder'] = (int)$item->frameborder;
+        $options['frameborder'] = (int) $item->frameborder;
     }
     else {
         $options['frameborder'] = 0;
     }
     $options['scrolling'] = !empty($item->scrolling) ? $item->scrolling : 'auto';
     if (!empty($item->transparency) && $item->transparency > 0) {
-        $options['transparency'] = (int)$item->transparency;
+        $options['transparency'] = (int) $item->transparency;
     }
     else {
         $options['transparency'] = 0;
     }
 
-    $htmlid = '';
     if (isset($item->htmlid) && !empty($item->htmlid)) {
-      $htmlid = ' id="' . htmlspecialchars($item->htmlid) . '" name="' . htmlspecialchars($item->htmlid) . '"';
+      $options['id'] = htmlspecialchars($item->htmlid);
+      $options['name'] = htmlspecialchars($item->htmlid);
     }
 
     // Append active class.
@@ -156,10 +154,11 @@ class IframeDefaultFormatter extends FormatterBase {
     if (!empty($options['title']) && strpos($options['title'], '<') !== FALSE) {
       $options['title'] = strip_tags($options['title']);
     }
-    $options_link = array(); $options_link['attributes'] = array();
-    $options_link['attributes']['title'] = $options['title'];
 
-    $drupal_attributes = new Attribute($options);
+    // policy attribute
+    if (!empty($item->allowfullscreen) && $item->allowfullscreen) {
+        $options['allow'] = (!empty($options['allow'])? $options['allow'] . "," : "") . "fullscreen";
+    }
 
     if (\Drupal::moduleHandler()->moduleExists('token')) {
       // Token Support for field "url" and "title"
@@ -175,20 +174,19 @@ class IframeDefaultFormatter extends FormatterBase {
         $path = \Drupal::token()->replace($path, $tokencontext);
       }
     }
+    $src = Url::fromUri($path, $options)->toString();
+    $options['src'] = $src;
 
-    $output =
-      '<div class="' . (!empty($options['class'])? new HtmlEscapedText($options['class']) : '') . '">'
-        . (empty($text)? '' : '<h3 class="iframe_title">' . (isset($options['html']) && $options['html'] ? $text : new HtmlEscapedText($text)) . '</h3>')
-        . '<iframe src="' . htmlspecialchars(Url::fromUri($path, $options)->toString()) . '"'
-          . $drupal_attributes->__toString()
-          . $htmlid
-        . '>'
-        . t('Your browser does not support iframes, but you can use the following link:') . ' ' . Link::fromTextAndUrl('Link', Url::fromUri($path, $options_link))->toString()
-        . '</iframe>'
-      . '</div>'
-    ;
-    return $output;
+    $drupal_attributes = new Attribute($options);
+
+    $render_array = [
+      '#theme' => 'iframe',
+      '#options' => $options,
+      '#attributes' => $drupal_attributes,
+      '#text' => (isset($options['html']) && $options['html'] ? $text : new HtmlEscapedText($text)),
+      '#src' => $src,
+    ];
+    return $render_array;
   }
-
 
 }

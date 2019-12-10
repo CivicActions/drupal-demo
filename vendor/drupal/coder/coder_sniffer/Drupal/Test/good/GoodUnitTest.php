@@ -3,10 +3,14 @@
  * Unit test class for all good files that must not throw errors/warnings.
  */
 
+namespace Drupal\good;
+
+use Drupal\Test\CoderSniffUnitTest;
+
 /**
  * Unit test class for all good files that must not throw errors/warnings.
  */
-class Drupal_GoodUnitTest extends CoderSniffUnitTest
+class GoodUnitTest extends CoderSniffUnitTest
 {
 
 
@@ -18,9 +22,9 @@ class Drupal_GoodUnitTest extends CoderSniffUnitTest
      *
      * @return array(int => int)
      */
-    public function getErrorList($testFile)
+    public function getErrorList()
     {
-        return array();
+        return [];
 
     }//end getErrorList()
 
@@ -33,44 +37,52 @@ class Drupal_GoodUnitTest extends CoderSniffUnitTest
      *
      * @return array(int => int)
      */
-    public function getWarningList($testFile)
+    public function getWarningList()
     {
-        return array();
+        return [];
 
     }//end getWarningList()
+
 
     /**
      * Returns a list of test files that should be checked.
      *
+     * @param string $testFileBase The base path that the unit tests files will have.
+     *
      * @return array The list of test files.
      */
-    protected function getTestFiles() {
+    protected function getTestFiles($testFileBase)
+    {
         $dir = dirname(__FILE__);
-        $di  = new DirectoryIterator($dir);
+        $di  = new \DirectoryIterator($dir);
 
         foreach ($di as $file) {
             $path = $file->getPathname();
-            if ($path !== __FILE__ && $file->isFile()) {
+            if ($path !== __FILE__ && $file->isFile() === true) {
                 $testFiles[] = $path;
             }
         }
 
+        $testFiles[] = __DIR__.'/drupal8/LongNamespace.php';
+
         // Get them in order.
         sort($testFiles);
         return $testFiles;
-    }
+
+    }//end getTestFiles()
+
 
     /**
      * Returns a list of sniff codes that should be checked in this test.
      *
      * @return array The list of sniff codes.
      */
-    protected function getSniffCodes() {
+    protected function allSniffCodes()
+    {
         // We want to test all sniffs defined in the standard.
-        return array();
-    }
+        return true;
+
+    }//end allSniffCodes()
 
 
 }//end class
-
-?>

@@ -22,6 +22,11 @@ class ContextualLinksTest extends WebDriverTestBase {
   /**
    * {@inheritdoc}
    */
+  protected $defaultTheme = 'stark';
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
     parent::setUp();
 
@@ -90,6 +95,21 @@ class ContextualLinksTest extends WebDriverTestBase {
     $this->getSession()->getPage()->find('css', '.contextual-toolbar-tab button')->press();
     $this->clickContextualLink('#block-branding', 'Test Link', FALSE);
     $this->assertSession()->pageTextContains('Everything is contextual!');
+  }
+
+  /**
+   * Test the contextual links destination.
+   */
+  public function testContextualLinksDestination() {
+    $this->grantPermissions(Role::load(Role::AUTHENTICATED_ID), [
+      'access contextual links',
+      'administer blocks',
+    ]);
+    $this->drupalGet('user');
+    $this->assertSession()->waitForElement('css', '.contextual button');
+    $expected_destination_value = (string) $this->loggedInUser->toUrl()->toString();
+    $contextual_link_url_parsed = parse_url($this->getSession()->getPage()->findLink('Configure block')->getAttribute('href'));
+    $this->assertEquals("destination=$expected_destination_value", $contextual_link_url_parsed['query']);
   }
 
 }

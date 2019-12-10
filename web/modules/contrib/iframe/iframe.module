@@ -65,4 +65,18 @@ function iframe_help($route_name, RouteMatchInterface $route_match) {
   }
 }
 
-
+/**
+ * Implements hook_theme().
+ */
+function iframe_theme($existing, $type, $theme, $path) {
+  return [
+    'iframe' => [
+      'variables' => [
+        'src' => NULL,
+        'attributes' => NULL,
+        'options' => NULL,
+        'text' => NULL,
+      ]
+    ]
+  ];
+}

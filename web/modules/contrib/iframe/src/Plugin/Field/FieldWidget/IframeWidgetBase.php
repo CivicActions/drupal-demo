@@ -27,6 +27,7 @@ class IframeWidgetBase extends WidgetBase {
       'scrolling' => '', # !! leave EMPTY string for recognition of first edit of manage-form-display !!
       'transparency' => 0,
       'tokensupport' => 0,
+      'allowfullscreen' => 0,
       // here if *own* default value not the one from edit-type-field
     ) + parent::defaultSettings();
   }
@@ -116,6 +117,14 @@ class IframeWidgetBase extends WidgetBase {
       '#default_value' => $values['tokensupport'], # 0
       '#description' => $this->t('Are tokens allowed for users to use in title or URL field?'),
     );
+    $element['allowfullscreen'] = array(
+      '#type' => 'select',
+      '#title' => $this->t('Allow fullscreen'),
+      '#options' => array('0' => $this->t('false'), '1' => $this->t('true')),
+      '#default_value' => $values['allowfullscreen'], # 0
+      '#description' => $this->t('Allow fullscreen for iframe. The iframe can activate fullscreen mode by calling the requestFullscreen() method.'),
+    );
+
     if (! \Drupal::moduleHandler()->moduleExists('token')) {
       $element['tokensupport']['#description'] .= ' ' . $this->t('Attention: Token module is not currently enabled!');
     }

@@ -38,6 +38,7 @@ class IframeItem extends FieldItemBase {
       'scrolling' => 'auto',
       'transparency' => 0,
       'tokensupport' => 0,
+      'allowfullscreen' => 0,
     ) + parent::defaultFieldSettings();
   }
 
@@ -71,6 +72,9 @@ class IframeItem extends FieldItemBase {
 
     $properties['tokensupport'] = DataDefinition::create('string')
       ->setLabel(t('Token support'));
+
+    $properties['allowfullscreen'] = DataDefinition::create('string')
+      ->setLabel(t('Allow fullscreen'));
 
     return $properties;
   }
@@ -141,6 +145,13 @@ class IframeItem extends FieldItemBase {
         ),
         'tokensupport' => array(
           'description' => 'Are tokens allowed for users to use in title or URL field?',
+          'type' => 'int',
+          'size' => 'tiny',
+          'not null' => TRUE,
+          'default' => 0,
+        ),
+        'allowfullscreen' => array(
+          'description' => 'Allow fullscreen for iframe. The iframe can activate fullscreen mode by calling the requestFullscreen() method.',
           'type' => 'int',
           'size' => 'tiny',
           'not null' => TRUE,

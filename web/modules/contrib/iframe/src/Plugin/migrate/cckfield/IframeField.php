@@ -7,7 +7,9 @@ use Drupal\migrate_drupal\Plugin\migrate\cckfield\CckFieldPluginBase;
 
 /**
  * @MigrateCckField(
- *   id = "iframe"
+ *   id = "iframe",
+ *   source_module = "iframe",
+ *   destination_module = "iframe"
  * )
  */
 class IframeField extends CckFieldPluginBase {

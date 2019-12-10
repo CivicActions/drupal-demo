@@ -45,12 +45,14 @@ use GuzzleHttp\Exception\ClientException;
  *       name: image
  *       label: 'Main Image'
  *       selector: /image
+ *     -
+ *       name: title
+ *       label: 'Some Title'
+ *       selector: /title
  *   constants:
  *     file_destination: 'public://path/to/save/'
  * process:
- *   title:
- *     plugin: default_value
- *     default_value: Some Title
+ *   title: title
  *   uid:
  *     plugin: default_value
  *     default_value: 1
@@ -61,6 +63,8 @@ use GuzzleHttp\Exception\ClientException;
  *     uid: @uid
  *     title: title
  *     alt: !file
+ *     width: 1920
+ *     height: 1080
  *     skip_on_missing_source: true
  *
  *
